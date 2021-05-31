@@ -71,9 +71,15 @@ class Blockchain {
                 block.height = self.height + 1
                 block.time = new Date().getTime().toString().slice(0, -3);
                 block.hash = SHA256(JSON.stringify(block)).toString();
-                self.height++;
-                self.chain.push(block);
-                resolve(block)
+                
+                const errors = await self.validateChain();
+                if (errors.length === 0) {
+                    self.height++;
+                    self.chain.push(block);
+                    resolve(block)
+                } else {
+                    reject(errors)
+                }
             } catch (err) {
                reject(err)
             }
@@ -119,10 +125,14 @@ class Blockchain {
                 const currentTime = parseInt(new Date().getTime().toString().slice(0, -3))
 
                 const isLessThanFiveMinutes = currentTime - messageTime < 300
-                if (!isLessThanFiveMinutes) reject('Time elapsed is more than five minutes')
+                if (!isLessThanFiveMinutes) {
+                    return reject('Time elapsed is more than five minutes')
+                }
 
                 const isValid = bitcoinMessage.verify(message,address, signature)
-                if (!isValid) reject('Verification has failed')
+                if (!isValid) {
+                    return reject('Verification has failed')
+                }
 
                 const newBlock = new BlockClass.Block({ owner: address, star: star })
                 resolve(self._addBlock(newBlock))
@@ -174,14 +184,18 @@ class Blockchain {
         let self = this;
         let stars = [];
         return new Promise((resolve, reject) => {
-            self.chain.forEach(async (block) => {
-                const bdata = await block.getBData()
-                if (bdata && bdata.owner === address) {
-                    stars.push(bdata)
-                }
-            })
-            if (!stars) reject('Could not find any start by the given wallet address')
-            resolve(stars)
+            try {
+                self.chain.forEach(async (block) => {
+                    const bdata = await block.getBData()
+                    if (bdata && bdata.owner === address) {
+                        stars.push(bdata)
+                    }
+                })
+                if (!stars) reject('Could not find any start by the given wallet address')
+                resolve(stars)
+            } catch (err) {
+                reject(err)
+            }
         });
     }
 
@@ -197,14 +211,16 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
             try {
                 self.chain.forEach(async (block, index) => {
-                    const isValid = await block.validate();
-                    if (!isValid) {
-                        errorLog.push(`Error: Block height: ${block.height} - Block is invalid`);
-                    }
+                    if (index != 0) {
+                        const isValid = await block.validate();
+                        if (!isValid) {
+                            errorLog.push(`Error: Block height: ${block.height} - Block is invalid`);
+                        }
 
-                    const previousBlockhash = self.chain[index - 1].hash
-                    if (previousBlockhash !== block.previousBlockHash) {
-                        errorLog.push(`Error: Block height: ${block.heihgt} - Hash for previosBlockhash (${block.previousBlockHash}) does not match with the hash of the chain (${previousBlockhash})`)
+                        const previousBlockhash = self.chain[index - 1].hash
+                        if (previousBlockhash !== block.previousBlockHash) {
+                            errorLog.push(`Error: Block height: ${block.heihgt} - Hash for previosBlockhash (${block.previousBlockHash}) does not match with the hash of the chain (${previousBlockhash})`)
+                        }
                     }
                 })
                 resolve(errorLog)
