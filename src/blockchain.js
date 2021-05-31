@@ -123,7 +123,6 @@ class Blockchain {
             try {
                 const messageTime = parseInt(message.split(':')[1])
                 const currentTime = parseInt(new Date().getTime().toString().slice(0, -3))
-
                 const isLessThanFiveMinutes = currentTime - messageTime < 300
                 if (!isLessThanFiveMinutes) {
                     return reject('Time elapsed is more than five minutes')
